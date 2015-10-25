@@ -46,8 +46,8 @@ This is clearly more work, but is necessary if your prism outline is convex.
 ### Future work
 There are many improvements that are obviously useful:
 
-1) Ability to output Radiance code directly, allowing it to be included in the input file itself.
-2) Support for -r -c and -e options and file or stdin inputs.
-3) Support for holes in the 2d shape.
-4) Support more advanced `gmsh` features for bevels and rounding.
+* Ability to output Radiance code directly, allowing it to be included in the input file itself.
+* Support for -r -c and -e options and file or stdin inputs.
+* Support for holes in the 2d shape.
+* Support more advanced `gmsh` features for bevels and rounding.
 

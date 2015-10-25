@@ -8,7 +8,15 @@ on popular Linux systems. On Red Hat or Fedora, install them with:
     sudo yum install gmsh meshlab
 
 ### Usage
-    genprism2.pl outfile.obj N x1 y1 x2 y2 x3 y3 [x4 y4 .. xN yN] [-t tx ty tz]
+    genprism2.pl outfile.[obj|stl|dae|ply] N x1 y1 x2 y2 x3 y3 [x4 y4 .. xN yN] [-t tx ty tz]
+
+The default extrusion vector is `0 0 1`.
+
+Because Meshlab recognizes a variety of file formats, feel free to try different extensions
+on the output file name.
+
+The program generates two temporary intermediate files which should be removed when the 
+program exits.
 
 ### Origin
 The Radiance Synthetic Imaging System contains a script called `genprism`, which can be

@@ -3,7 +3,7 @@
 # Rewrite of Radiance's genprism, but will create proper-capped prisms
 #
 # usage:
-#   genprism2.pl outfile N [x1 y1 x2 y2 .. xN yN] [-l lvec]
+#   genprism2.pl outfile N [x1 y1 x2 y2 .. xN yN] [-l lvec] [-nodec]
 #
 # will create a .obj file with caps and closing polygon using the lvec 3-tuple extrusion vector
 #
@@ -46,6 +46,7 @@ my $tx = 0;
 my $ty = 0;
 my $tz = 1;
 my $outFile = "out.obj";
+my $noDecimate = 0;
 
 # Read command-line into arrays
 
@@ -105,27 +106,47 @@ for (; $iarg<$nargs; $iarg++) {
       $lengthScale = $extLen > $lengthScale ? $extLen : $lengthScale;
       #print "Length scale is ${lengthScale}\n";
     }
+  } elsif ($ARGV[$iarg] eq "-nodec") {
+    $noDecimate = 1;
   } else {
     print "Unrecognized argument ($ARGV[$iarg]).\n";
   }
 }
 
 # Generate meshlabserver script file if it's not already there
+# this one works on Meshlab 1.3.3
 
-my $meshScript = ".reorientAndDedup.mlx";
-if (! -f "${meshScript}") {
-  open(MLS,">${meshScript}") or die "Can't open ${meshScript}: $!";
-  print MLS "<!DOCTYPE FilterScript>\n";
-  print MLS "<FilterScript>\n";
-  print MLS " <filter name=\"Remove Duplicated Vertex\"/>\n";
-  print MLS " <filter name=\"Re-Orient all faces coherentely\"/>\n";
-  print MLS " <filter name=\"Invert Faces Orientation\">\n";
-  print MLS "  <Param type=\"RichBool\" value=\"true\" name=\"forceFlip\"/>\n";
-  print MLS " </filter>\n";
-  print MLS " <filter name=\"Remove Duplicated Vertex\"/>\n";
-  print MLS "</FilterScript>\n";
-  close(MLS);
+my ($mlabFH, $mlabFileName) = tempfile( SUFFIX => '.mlx');
+print $mlabFH "<!DOCTYPE FilterScript>\n";
+print $mlabFH "<FilterScript>\n";
+print $mlabFH " <filter name=\"Remove Duplicated Vertex\"/>\n";
+print $mlabFH " <filter name=\"Re-Orient all faces coherentely\"/>\n";
+print $mlabFH " <filter name=\"Invert Faces Orientation\">\n";
+print $mlabFH "  <Param type=\"RichBool\" value=\"true\" name=\"forceFlip\"/>\n";
+print $mlabFH "  <Param type=\"RichBool\" value=\"true\" name=\"onlySelected\"/>\n";
+print $mlabFH " </filter>\n";
+print $mlabFH " <filter name=\"Remove Duplicated Vertex\"/>\n";
+if (! $noDecimate) {
+  # theoretically, we should be able to reduce to 4*(nPts-1)
+  # but that doesn't always work well with QECD, so reduce to double that number
+  my $nTri = 8*($nPts-1);
+  print $mlabFH " <filter name=\"Quadric Edge Collapse Decimation\">\n";
+  print $mlabFH "   <Param type=\"RichInt\" value=\"${nTri}\" name=\"TargetFaceNum\"/>\n";
+  print $mlabFH "   <Param type=\"RichFloat\" value=\"0\" name=\"TargetPerc\"/>\n";
+  print $mlabFH "   <Param type=\"RichFloat\" value=\"0.3\" name=\"QualityThr\"/>\n";
+  print $mlabFH "   <Param type=\"RichBool\" value=\"false\" name=\"PreserveBoundary\"/>\n";
+  print $mlabFH "   <Param type=\"RichFloat\" value=\"1\" name=\"BoundaryWeight\"/>\n";
+  print $mlabFH "   <Param type=\"RichBool\" value=\"false\" name=\"PreserveNormal\"/>\n";
+  print $mlabFH "   <Param type=\"RichBool\" value=\"false\" name=\"PreserveTopology\"/>\n";
+  print $mlabFH "   <Param type=\"RichBool\" value=\"true\" name=\"OptimalPlacement\"/>\n";
+  print $mlabFH "   <Param type=\"RichBool\" value=\"true\" name=\"PlanarQuadric\"/>\n";
+  print $mlabFH "   <Param type=\"RichBool\" value=\"false\" name=\"QualityWeight\"/>\n";
+  print $mlabFH "   <Param type=\"RichBool\" value=\"true\" name=\"AutoClean\"/>\n";
+  print $mlabFH "   <Param type=\"RichBool\" value=\"false\" name=\"Selected\"/>\n";
+  print $mlabFH " </filter>\n";
 }
+print $mlabFH "</FilterScript>\n";
+close($mlabFH);
 
 # Generate gmsh input file
 
@@ -157,13 +178,14 @@ my $command = "gmsh ${gmshFileName} -2 -v 0 -o ${stlFileName}";
 print "Running \"${command}\"\n";
 system $command;
 
-$command = "meshlabserver -i ${stlFileName} -s ${meshScript} -o ${outFile}";
+$command = "meshlabserver -i ${stlFileName} -s ${mlabFileName} -o ${outFile}";
 print "Running \"${command}\"\n";
 system $command;
 
 # Delete intermediaries
 
 unlink $stlFileName;
+unlink $mlabFileName;
 unlink $gmshFileName;
 
 print "Done.\n";

@@ -54,4 +54,5 @@ There are many improvements that are obviously useful:
 * Support for -r -c and -e options.
 * Support for holes in the 2d shape.
 * Support more advanced `gmsh` features for bevels and rounding.
+* If first two args are not numeric, assume they are material and name, and operate as a genprism drop-in replacement; write a temporary .obj file, convert it to msh, and write the "mat mesh name" entry to stdout.
 

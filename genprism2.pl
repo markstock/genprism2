@@ -25,7 +25,7 @@ if (length $gmshExists < 1) {
   exit(1);
 }
 chomp ${gmshExists};
-print "Using ${gmshExists}\n";
+print STDERR "Using ${gmshExists}\n";
 
 my $meshlabExists = `which meshlabserver`;
 if (length $meshlabExists < 1) {
@@ -35,7 +35,7 @@ if (length $meshlabExists < 1) {
   exit(1);
 }
 chomp ${meshlabExists};
-print "Using ${meshlabExists}\n";
+print STDERR "Using ${meshlabExists}\n";
 
 # Set defaults/initialization
 
@@ -77,14 +77,14 @@ for (my $ipt=0; $ipt<$nPts; $ipt++) {
   }
   push @y, $ARGV[$iarg];
 }
-print "Found $nPts points.\n";
+print STDERR "Found $nPts points.\n";
 $iarg++;
 
 # Get estimate for length scale
 my $xrange = max @x - min @x;
 my $yrange = max @y - min @y;
 my $lengthScale = $xrange > $yrange ? $xrange : $yrange;
-#print "Length scale is ${lengthScale}\n";
+#print STDERR "Length scale is ${lengthScale}\n";
 
 # Look for optional arguments
 
@@ -101,15 +101,15 @@ for (; $iarg<$nargs; $iarg++) {
       print "Cannot use zero-length extrusion vector.\n";
       exit(1);
     } else {
-      print "Read extrusion vector $tx $ty $tz\n";
+      print STDERR "Read extrusion vector $tx $ty $tz\n";
       my $extLen = sqrt($tx*$tx + $ty*$ty + $tz*$tz);
       $lengthScale = $extLen > $lengthScale ? $extLen : $lengthScale;
-      #print "Length scale is ${lengthScale}\n";
+      #print STDERR "Length scale is ${lengthScale}\n";
     }
   } elsif ($ARGV[$iarg] eq "-nodec") {
     $noDecimate = 1;
   } else {
-    print "Unrecognized argument ($ARGV[$iarg]).\n";
+    print STDERR "Unrecognized argument ($ARGV[$iarg]).\n";
   }
 }
 
@@ -175,11 +175,11 @@ close($gmshFH);
 
 my ($stlFH, $stlFileName) = tempfile( SUFFIX => '.stl');
 my $command = "gmsh ${gmshFileName} -2 -v 0 -o ${stlFileName}";
-print "Running \"${command}\"\n";
+print STDERR "Running \"${command}\"\n";
 system $command;
 
-$command = "meshlabserver -i ${stlFileName} -s ${mlabFileName} -o ${outFile}";
-print "Running \"${command}\"\n";
+$command = "meshlabserver -i ${stlFileName} -s ${mlabFileName} -o ${outFile} -l filterout";
+print STDERR "Running \"${command}\"\n";
 system $command;
 
 # Delete intermediaries
@@ -188,4 +188,4 @@ unlink $stlFileName;
 unlink $mlabFileName;
 unlink $gmshFileName;
 
-print "Done.\n";
+print STDERR "Done.\n";

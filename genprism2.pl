@@ -3,9 +3,10 @@
 # Rewrite of Radiance's genprism, but will create proper-capped prisms
 #
 # usage:
-#   genprism2.pl outfile N [x1 y1 x2 y2 .. xN yN] [-l lvec] [-nodec]
+#   genprism2.pl N [x1 y1 x2 y2 .. xN yN] [-l lvec] [-nodec] [-of format] > file.format
 #
-# will create a .obj file with caps and closing polygon using the lvec 3-tuple extrusion vector
+# will create a triangle mesh file with caps and closing polygon using the
+#   lvec 3-tuple extrusion vector, in the given format
 #
 # requires meshlab and gmsh
 #
@@ -19,9 +20,9 @@ use List::Util qw( min max );
 
 my $gmshExists = `which gmsh`;
 if (length $gmshExists < 1) {
-  print "gmsh executable does not exist or is not in your PATH\n";
-  print "On Red Hat/Fedora, try \"sudo yum install gmsh\"\n";
-  print "Quitting.\n";
+  print STDERR "gmsh executable does not exist or is not in your PATH\n";
+  print STDERR "On Red Hat/Fedora, try \"sudo yum install gmsh\"\n";
+  print STDERR "Quitting.\n";
   exit(1);
 }
 chomp ${gmshExists};
@@ -29,9 +30,9 @@ print STDERR "Using ${gmshExists}\n";
 
 my $meshlabExists = `which meshlabserver`;
 if (length $meshlabExists < 1) {
-  print "meshlab executable does not exist or is not in your PATH\n";
-  print "On Red Hat/Fedora, try \"sudo yum install meshlab\"\n";
-  print "Quitting.\n";
+  print STDERR "meshlab executable does not exist or is not in your PATH\n";
+  print STDERR "On Red Hat/Fedora, try \"sudo yum install meshlab\"\n";
+  print STDERR "Quitting.\n";
   exit(1);
 }
 chomp ${meshlabExists};
@@ -45,34 +46,33 @@ my $nPts = 0;
 my $tx = 0;
 my $ty = 0;
 my $tz = 1;
-my $outFile = "out.obj";
+my $outFormat = "obj";
 my $noDecimate = 0;
 
 # Read command-line into arrays
 
 my $nargs = @ARGV;
 if ($nargs < 2) {
-  print "At least two arguments are required:\n";
-  print "    outfile.obj N\n";
+  print STDERR "At least two arguments are required:\n";
+  print STDERR "    outfile.obj N\n";
   exit();
 }
 
-$outFile = $ARGV[0];
-$nPts = $ARGV[1];
-if ($nPts < 3) {
-  print "Program needs more than two points to make a prism.\n";
+$nPts = $ARGV[0];
+if ($nPts < 2) {
+  print STDERR "Program needs more than two points to make a prism.\n";
   exit();
 }
-my $iarg = 1;
+my $iarg = 0;
 for (my $ipt=0; $ipt<$nPts; $ipt++) {
   if (++$iarg >= $nargs) {
-    print "Not enough coordinates on command line, expecting ",$nPts*2," numbers.\n";
+    print STDERR "Not enough coordinates on command line, expecting ",$nPts*2," numbers.\n";
     exit(1);
   }
   push @x, $ARGV[$iarg];
 
   if (++$iarg >= $nargs) {
-    print "Not enough coordinates on command line, expecting ",$nPts*2," numbers.\n";
+    print STDERR "Not enough coordinates on command line, expecting ",$nPts*2," numbers.\n";
     exit(1);
   }
   push @y, $ARGV[$iarg];
@@ -91,14 +91,14 @@ my $lengthScale = $xrange > $yrange ? $xrange : $yrange;
 for (; $iarg<$nargs; $iarg++) {
   if ($ARGV[$iarg] eq "-t") {
     if ($iarg+3 >= $nargs) {
-      print "Not enough components on command line, expecting 3 floats.\n";
+      print STDERR "Not enough components on command line, expecting 3 floats.\n";
       exit(1);
     }
     $tx = $ARGV[++$iarg];
     $ty = $ARGV[++$iarg];
     $tz = $ARGV[++$iarg];
     if (abs($tx) + abs($ty) + abs($tz) == 0) {
-      print "Cannot use zero-length extrusion vector.\n";
+      print STDERR "Cannot use zero-length extrusion vector.\n";
       exit(1);
     } else {
       print STDERR "Read extrusion vector $tx $ty $tz\n";
@@ -106,6 +106,9 @@ for (; $iarg<$nargs; $iarg++) {
       $lengthScale = $extLen > $lengthScale ? $extLen : $lengthScale;
       #print STDERR "Length scale is ${lengthScale}\n";
     }
+  } elsif ($ARGV[$iarg] eq "-of") {
+    $outFormat = $ARGV[++$iarg];
+    print STDERR "Setting output format to ($outFormat).\n";
   } elsif ($ARGV[$iarg] eq "-nodec") {
     $noDecimate = 1;
   } else {
@@ -172,14 +175,21 @@ print $gmshFH "Extrude {$tx, $ty, $tz} {Surface{",$nPts+2,"};}\n";
 close($gmshFH);
 
 # Execute gmsh and meshlabserver
+# note to redirect stdout away because we want to echo the final file!
 
 my ($stlFH, $stlFileName) = tempfile( SUFFIX => '.stl');
-my $command = "gmsh ${gmshFileName} -2 -v 0 -o ${stlFileName}";
+my $command = "gmsh ${gmshFileName} -2 -v 0 -o ${stlFileName} > /dev/null";
 print STDERR "Running \"${command}\"\n";
 system $command;
 
-$command = "meshlabserver -i ${stlFileName} -s ${mlabFileName} -o ${outFile} -l filterout";
+my ($outFH, $outFileName) = tempfile( SUFFIX => ".${outFormat}");
+$command = "meshlabserver -i ${stlFileName} -s ${mlabFileName} -o ${outFileName} > /dev/null";
 print STDERR "Running \"${command}\"\n";
+system $command;
+
+# Echo final file to stdout
+
+$command = "cat ${outFileName}";
 system $command;
 
 # Delete intermediaries
@@ -187,5 +197,6 @@ system $command;
 unlink $stlFileName;
 unlink $mlabFileName;
 unlink $gmshFileName;
+unlink $outFileName;
 
 print STDERR "Done.\n";
